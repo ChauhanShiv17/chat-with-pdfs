@@ -102,11 +102,23 @@ def ask_question(request: QuestionRequest):
 
     results = collection.query(
         query_embeddings=[question_embedding],
-        n_results=4
+        n_results=4,
+        include=["documents", "metadatas", "distances"]
     )
 
-    matched_chunks = results["documents"][0]
-    sources = results["metadatas"][0]
+    all_chunks = results["documents"][0]
+    all_sources = results["metadatas"][0]
+    all_distances = results["distances"][0]
+
+    DISTANCE_THRESHOLD = 1.0
+
+    matched_chunks = []
+    sources = []
+
+    for chunk, source, distance in zip(all_chunks, all_sources, all_distances):
+        if distance < DISTANCE_THRESHOLD:
+            matched_chunks.append(chunk)
+            sources.append(source)
 
     if not matched_chunks:
         return {
