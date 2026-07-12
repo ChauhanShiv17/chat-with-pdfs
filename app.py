@@ -6,6 +6,10 @@ import os
 import fitz
 import chromadb
 from sentence_transformers import SentenceTransformer
+from dotenv import load_dotenv
+import ollama
+
+load_dotenv()
 
 app = FastAPI()
 
@@ -98,7 +102,7 @@ def ask_question(request: QuestionRequest):
 
     results = collection.query(
         query_embeddings=[question_embedding],
-        n_results=3
+        n_results=4
     )
 
     matched_chunks = results["documents"][0]
@@ -111,10 +115,25 @@ def ask_question(request: QuestionRequest):
             "sources": []
         }
 
-    answer = matched_chunks[0]
+    context = "\n\n---\n\n".join(matched_chunks)
 
-    if len(answer) > 700:
-        answer = answer[:700] + "..."
+    system_prompt = (
+        "You are a helpful assistant that answers questions using only the "
+        "provided context from a PDF document. If the answer isn't in the "
+        "context, say you don't know based on the document. Be concise."
+    )
+
+    user_prompt = f"Context:\n{context}\n\nQuestion: {request.question}"
+
+    ollama_response = ollama.chat(
+        model="phi3:latest",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+    )
+
+    answer = ollama_response["message"]["content"]
 
     return {
         "question": request.question,
